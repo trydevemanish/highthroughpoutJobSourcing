@@ -101,7 +101,6 @@ app.post('/navie-api', rateLimiting({endpoint:"events", rate_limit:{limit: 10, t
     }
 })
 
-
 async function start(){
     app.listen(PORT, () => console.log(`Server Started at : ${PORT}`))
     await connectRabbit()

@@ -5,9 +5,9 @@ import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
 export const options = {
   stages: [
-    { duration: '30s', target: 10 },    // ramp up to 50 users
-    // { duration: '1m',  target: 200 },   // push to 200 users
-    // { duration: '30s', target: 0 },     // ramp down
+    { duration: '30s', target: 50 },    // ramp up to 50 users
+    { duration: '1m',  target: 200 },   // push to 200 users
+    { duration: '30s', target: 0 },     // ramp down
   ],
   thresholds: {
     http_req_failed:   ['rate<0.01'],   // under 1% errors
@@ -62,7 +62,7 @@ export default function () {
     }
   );
 
-  const res = http.post('http://host.docker.internal:3000/navie-api/', payload, {
+  const res = http.post('http://host.docker.internal:3000/events/', payload, {
     headers: {
       'Content-Type': 'application/json',
     },

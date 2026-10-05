@@ -1,7 +1,9 @@
+import cluster from "cluster";
 import { QUEUE, RETRY_QUEUE, DLQ, getChannel, connectRabbit } from "../../shared/rabbit";
 import { redis } from "../../shared/redis";
 import { EmailProvider } from "../consumer/emailConsumer";
 import { SmsProvider } from "../consumer/smsConsumer";
+import os from 'os'
 
 const MAX_ATTEMPTS = 3
 
@@ -39,17 +41,21 @@ export async function consumeEvent() {
 
 
 async function start() {
-  await connectRabbit()   // 1. connect first
-  await consumeEvent()    // 2. then register the consumer
-  console.log('Worker started, waiting for messages...')
+    await connectRabbit()
+    await consumeEvent() 
+    console.log('Worker started, waiting for messages...')
 }
 
 start().catch(err => {
-  console.error('Worker failed to start:', err)
-  process.exit(1)         // exit so Docker restarts it instead of hiding the crash
+    console.error('Worker failed to start:', err)
+    process.exit(1)         // exit so Docker restarts it instead of hiding the crash
 })
 
-
-// didn't handle those 
-// retries 
-// dead letter queue 
+// let cpuCount = os.cpus.length
+// for(let i=0; i<cpuCount; i++){
+//     cluster.fork()
+//     start().catch(err => {
+//         console.error('Worker failed to start:', err)
+//         process.exit(1)         // exit so Docker restarts it instead of hiding the crash
+//     })
+// }
