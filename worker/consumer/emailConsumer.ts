@@ -1,4 +1,4 @@
-import {EMAILPROVIDER} from '../../shared/config'
+import {EMAIL_FAIL_RATE, EMAILPROVIDER} from '../../shared/config'
 
 interface Provider {
     send(from: string, to: string, message: string): Promise<{message: string}>
@@ -8,7 +8,7 @@ interface Provider {
 export class MockEmailProvider implements Provider {
     async send(from: string, to: string, message: string): Promise<{ message: string }> {
         await new Promise(r => setTimeout(r, 50 + Math.random() * 100))
-        if(Math.random() < 0) return new Error('Provider TimeOut.')
+        if (Math.random() < EMAIL_FAIL_RATE) throw new Error('SMTP timeout');
         return {message : `Message Send: ${to}`}
     }
 }

@@ -4,6 +4,7 @@ export const OrderPlacedSchema = z.object({
     eventId: z.string(),
     eventType: z.literal("order.placed"),
     idempotencyKey: z.string(),
+    runId:z.string(),
     payload: z.object({
         orderId: z.string(),
         customer: z.object({

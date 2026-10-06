@@ -3,25 +3,34 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
+// export const options = {
+//   stages: [
+//     { duration: '30s', target: 50 },    // ramp up to 50 users
+//     { duration: '1m',  target: 200 },   // push to 200 users
+//     { duration: '30s', target: 0 },     // ramp down
+//   ],
+//   thresholds: {
+//     http_req_failed:   ['rate<0.01'],   // under 1% errors
+//     http_req_duration: ['p(95)<200'],   // 95% of requests under 200ms
+//   },
+// };
+
+
+// sync vs queued job test ------
 export const options = {
-  stages: [
-    { duration: '30s', target: 50 },    // ramp up to 50 users
-    { duration: '1m',  target: 200 },   // push to 200 users
-    { duration: '30s', target: 0 },     // ramp down
-  ],
-  thresholds: {
-    http_req_failed:   ['rate<0.01'],   // under 1% errors
-    http_req_duration: ['p(95)<200'],   // 95% of requests under 200ms
-  },
-};
+  vus:100,
+  duration: '1m'
+}
 
 
 export default function () {
+  const param = __ENV.TEST_TYPE;
   const payload = JSON.stringify(
     {
         "eventId": "evt_001",
         "eventType": "order.placed",
         "idempotencyKey": uuidv4(),
+        "runId": "run-1",
         "payload": {
             "orderId": "ORD-10021",
             "customer": {
@@ -62,11 +71,22 @@ export default function () {
     }
   );
 
-  const res = http.post('http://host.docker.internal:3000/events/', payload, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  let res;
+  if(param === "queued"){
+    res = http.post('http://host.docker.internal:3000/events/', payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+  
+  if(param === "naive"){
+    res = http.post('http://host.docker.internal:3000/navie-api/', payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
 
   check(res, {
     'status is 202': (r) => r.status === 202,
@@ -76,3 +96,5 @@ export default function () {
   sleep(0.1);
 }
 
+
+// --------------------------

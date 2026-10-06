@@ -9,6 +9,7 @@ import { rateLimiting } from '../middleware/ratelimiting';
 import { configDotenv } from 'dotenv';
 import { SmsProvider } from '../../worker/consumer/smsConsumer';
 import { EmailProvider } from '../../worker/consumer/emailConsumer';
+import { recordStatus } from '../../shared/metric';
 
 configDotenv()
 const app = express();
@@ -36,6 +37,7 @@ app.post('/events', async(req, res) => {
             await redis.hset(`job:${jobId}`,{jobId: jobId, status:"queued"})
             await redis.expire(`job:${jobId}`, 86400)
             await publishEvent({jobId, ...event})
+            await recordStatus(event.runId, 'queued')
         } catch (error) {
             await redis.del(idemKey)
             throw error
@@ -43,6 +45,7 @@ app.post('/events', async(req, res) => {
 
         return res.status(202).json({ jobId, status: 'queued' })
     } catch (error) {
+        await recordStatus(event.runId, 'failed');
         return res.status(500).json({ error: 'Could not queue event' })
     }
 })
@@ -72,34 +75,36 @@ app.get("/", async(req, res)=>{
     return res.status(200).json({ 'message' : 'hey it works' })
 })
 
-app.post('/navie-api', rateLimiting({endpoint:"events", rate_limit:{limit: 10, time: 3}}), async(req,res) => {
+app.post('/navie-api', async(req,res) => {
     const parse = OrderPlacedSchema.safeParse(req.body)
     if(!parse.success){
         return res.status(400).json({'message' : 'Invalid Data', error: parse.error.flatten()})
     }
 
-    const event = parse.data
     // const idemKey = `idem:${event.idempotencyKey}`
     const jobId = randomUUID()
+    const key = `job:${jobId}`;
 
     try {
-        // const isNew = await redis.set(idemKey, jobId, 'EX', 86400, 'NX')
-        // if(isNew === null){
-        //     const existingJobId = await redis.get(idemKey)
-        //     return res.status(400).json({'message':'Duplicate Request', jobId: existingJobId})
-        // } 
+        await redis.hset(key, {jobId: jobId, status:"queued"})
+        await recordStatus(parse.data.runId, 'queued')
+        await redis.expire(key, 86400)
 
-        await redis.hset(`job:${jobId}`,{jobId: jobId, status:"queued"})
-        await redis.expire(`job:${jobId}`, 86400)
         await SmsProvider.send("","")
         await EmailProvider.send("", "", "")
-        redis.hset(`job:${jobId}`,{jobId: jobId, status:"done"})
-        return res.status(201).json({'mesasage': 'work done', jobId: jobId})
+
+        await redis.hset(key, {jobId: jobId, status:"done"})
+        await recordStatus(parse.data.runId, 'done')
+        return res.status(200).json({'mesasage': 'work done', jobId: jobId})
     } catch (error: any) {
         console.log(`${error}`)
+        await redis.hset(key, { status: 'failed', error: String(error.message) });
+        await recordStatus(parse.data.runId, 'failed'); 
         return res.status(500).json({'message':`${error.message}`})
     }
 })
+
+//----------------------------------------------------------------------
 
 async function start(){
     app.listen(PORT, () => console.log(`Server Started at : ${PORT}`))
@@ -109,6 +114,6 @@ async function start(){
 start().catch(err => {
   console.error('Startup failed:', err)
   process.exit(1)
-}) //starting point of the code
+}) 
 
 export default app
